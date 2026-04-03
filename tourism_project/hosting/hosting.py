@@ -1,37 +1,29 @@
-"""Hosting script — push deployment files to HF Docker Space."""
-import os, sys
-from huggingface_hub import HfApi, create_repo, login
+# Token comes from environment (set in Step 1 / GitHub Actions secret)
+from huggingface_hub import HfApi
 from huggingface_hub.utils import RepositoryNotFoundError
+import os
 
-HF_TOKEN   = os.environ["HF_TOKEN"]
-SPACE_REPO = "rknv1984/tourism-predictor"
-login(token=HF_TOKEN, add_to_git_credential=False)
+api   = HfApi(token=os.environ.get("HF_TOKEN"))
+SPACE = "rknv1984/tourism-project"
 
-api = HfApi(token=HF_TOKEN)
 try:
-    api.repo_info(SPACE_REPO, repo_type="space")
-    print(f"Space exists: {SPACE_REPO}")
+    api.repo_info(repo_id=SPACE, repo_type="space")
+    print(f"Space {SPACE} already exists.")
 except RepositoryNotFoundError:
-    create_repo(SPACE_REPO, token=HF_TOKEN, repo_type="space", space_sdk="docker", private=False)
-    print(f"Created Space: {SPACE_REPO}")
+    api.create_repo(repo_id=SPACE, repo_type="space", space_sdk="docker", private=False)
+    print(f"Space {SPACE} created.")
 
-# Resolve deployment folder relative to this script — works on both
-# GitHub Actions runner and any local/Colab path
-script_dir  = os.path.dirname(os.path.abspath(__file__))
-deploy_dir  = os.path.normpath(os.path.join(script_dir, "..", "deployment"))
-print(f"Deployment folder: {deploy_dir}")
+try:
+    api.delete_file(path_in_repo="streamlit_app.py", repo_id=SPACE, repo_type="space")
+    print("Deleted default streamlit_app.py.")
+except Exception:
+    pass
 
-for fname in ["app.py", "requirements.txt", "Dockerfile", "README.md"]:
-    fpath = os.path.join(deploy_dir, fname)
-    if not os.path.exists(fpath):
-        print(f"⚠️  Missing: {fpath} — skipping")
-        continue
+for filename in ["Dockerfile","app.py","requirements.txt"]:
     api.upload_file(
-        path_or_fileobj=fpath,
-        path_in_repo=fname,
-        repo_id=SPACE_REPO, repo_type="space",
-        token=HF_TOKEN, commit_message=f"Deploy {fname}",
-    )
-    print(f"✅ Uploaded {fname}")
+        path_or_fileobj=f"tourism_project/deployment/{filename}",
+        path_in_repo=filename, repo_id=SPACE, repo_type="space")
+    print(f"  Uploaded {filename}")
 
-print(f"\n🚀 App live: https://huggingface.co/spaces/{SPACE_REPO}")
+print(f"\n✅ Deployment complete: https://huggingface.co/spaces/{SPACE}")
+print("Space rebuilds in ~3 minutes.")

@@ -2,79 +2,52 @@ name: Tourism MLOps Pipeline
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:   # allow manual trigger from GitHub UI
+    branches: [main]
 
 jobs:
-
-  # ── Step 1: Register raw data on HF Hub ────────────────────────────────────
-  data-registration:
-    name: 1 - Data Registration
+  1-Data-Registration:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
-        run: pip install huggingface_hub datasets
-
-      - name: Run data registration script
+      - uses: actions/checkout@v3
+      - name: Install Dependencies
+        run: pip install -r tourism_project/requirements.txt
+      - name: Register Dataset on HF Hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python tourism_project/data_register.py
+        run: python tourism_project/model_building/data_register.py
 
-  # ── Step 2: Data preparation ────────────────────────────────────────────────
-  data-preparation:
-    name: 2 - Data Preparation
-    needs: data-registration
+  2-Data-Preparation:
+    needs: 1-Data-Registration
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      - name: Install dependencies
-        run: pip install huggingface_hub datasets scikit-learn pandas
-      - name: Run data preparation script
+      - uses: actions/checkout@v3
+      - name: Install Dependencies
+        run: pip install -r tourism_project/requirements.txt
+      - name: Clean Encode and Upload Splits
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python tourism_project/prep.py
+        run: python tourism_project/model_building/prep.py
 
-  # ── Step 3: Model training ──────────────────────────────────────────────────
-  model-training:
-    name: 3 - Model Training
-    needs: data-preparation
+  3-Model-Training:
+    needs: 2-Data-Preparation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      - name: Install dependencies
-        run: pip install huggingface_hub datasets scikit-learn xgboost mlflow pandas joblib
-      - name: Run training script
+      - uses: actions/checkout@v3
+      - name: Install Dependencies
+        run: pip install -r tourism_project/requirements.txt
+      - name: Train Model and Register on HF Hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python tourism_project/train.py
+        run: python tourism_project/model_building/train.py
 
-  # ── Step 4: Deploy to Hugging Face Space ───────────────────────────────────
-  model-deployment:
-    name: 4 - Model Deployment
-    needs: model-training
+  4-Model-Deployment:
+    needs: 3-Model-Training
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      - name: Install dependencies
-        run: pip install huggingface_hub
-      - name: Push deployment files to HF Space
+      - uses: actions/checkout@v3
+      - name: Install Dependencies
+        run: pip install -r tourism_project/requirements.txt
+      - name: Deploy to HF Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python tourism_project/hosting/hosting.py
